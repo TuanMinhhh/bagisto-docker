@@ -22,9 +22,10 @@ $DOCKER_COMPOSE down -v
 # building and running docker-compose file
 $DOCKER_COMPOSE build && $DOCKER_COMPOSE up -d
 
-# container id by image name
-php_container_id=$(docker ps -aqf "name=php-fpm")
-db_container_id=$(docker ps -aqf "name=mysql")
+# container ids for this compose project (avoids picking wrong containers)
+php_container_id=$($DOCKER_COMPOSE ps -q php-fpm)
+db_container_id=$($DOCKER_COMPOSE ps -q mysql)
+CONTAINER_USER=${USER:-developer}
 
 # checking connection
 echo "Please wait... Waiting for MySQL connection..."
@@ -58,6 +59,8 @@ docker exec -i ${php_container_id} bash -c "cd bagisto && composer install"
 # moving `.env` file
 docker cp .configs/.env ${php_container_id}:/var/www/html/bagisto/.env
 docker cp .configs/.env.testing ${php_container_id}:/var/www/html/bagisto/.env.testing
+# docker cp creates root-owned files; app user must own .env for key:generate etc.
+docker exec -u root ${php_container_id} chown -R ${CONTAINER_USER}:www-data /var/www/html/bagisto
 
 # executing final commands
 docker exec -i ${php_container_id} bash -c "cd bagisto && php artisan bagisto:install --skip-env-check --skip-admin-creation"

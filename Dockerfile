@@ -33,7 +33,19 @@ RUN apt-get install -y libmagickwand-dev \
 RUN docker-php-ext-configure intl && docker-php-ext-install intl
 
 # other extensions install
-RUN docker-php-ext-install bcmath calendar exif gmp mysqli pdo pdo_mysql zip
+RUN docker-php-ext-install bcmath calendar exif gmp mysqli opcache pdo pdo_mysql zip
+
+# OPcache + realpath cache: large win for Bagisto’s many PHP files (especially on slow bind mounts).
+RUN { \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.memory_consumption=256'; \
+    echo 'opcache.interned_strings_buffer=32'; \
+    echo 'opcache.max_accelerated_files=30000'; \
+    echo 'opcache.validate_timestamps=1'; \
+    echo 'opcache.revalidate_freq=2'; \
+    echo 'realpath_cache_size=8192K'; \
+    echo 'realpath_cache_ttl=600'; \
+    } > /usr/local/etc/php/conf.d/docker-php-performance.ini
 
 # installing composer
 COPY --from=composer:2.7 /usr/bin/composer /usr/local/bin/composer
@@ -47,10 +59,10 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 RUN npm install -g npx
 RUN npm install -g laravel-echo-server
 
-# arguments
+# arguments (defaults help Windows hosts where USER is unset)
 ARG container_project_path
-ARG uid
-ARG user
+ARG uid=1000
+ARG user=developer
 
 # copy php-fpm pool configuration
 COPY ./.configs/nginx/pools/www.cnf /usr/local/etc/php-fpm.d/www.conf
